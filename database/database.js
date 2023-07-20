@@ -7,7 +7,7 @@ mongoose.connect('mongodb+srv://devprodesso:devapp.CRM2022@prodessosystems.o5ljv
   useUnifiedTopology: true
 }).then(db => console.log('Db is connected'))
   .catch(err => (
-    mongoose.connect("mongodb://localhost:27017/CRMPROD1", function(err, db) {
+    mongoose.connect("mongodb://localhost:27017/CRMPRODSCKT", function(err, db) {
       if (err) throw err;
       if (db) throw db;
       // Use this space to pass MongoDB CRUD code here             
