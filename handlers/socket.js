@@ -4,6 +4,7 @@ const models = './database/models/'
 const hym = require('../middleware.js');
 const schemas = require('../middleware.js').schemas
 const handler = require('./handler')
+const graficas = require('./datosGraficas')
 const auditoria = require('../database/models/administracion/auditoria.js')
 const User = require('../database/models/administracion/usuario.js')
 const jsonc = require('jsonc');
@@ -74,24 +75,13 @@ function encrypt(text) {
 module.exports = function(io) {
 	io.on("connection", (socket) => {
 		const req = socket.request;
+		console.log(req.sessionID)
 		schemas.forEach(async (schema) => {
 			const model = await hym(models, schema);
 			await Promise.resolve(handler(socket, '../' + model, schema))
 		})
-		socket.on("session", async (userid) => {
-			const user = await User.findOne({ _id: userid }).exec();
-			if (user) {
-				req.session.auth = true;
-				req.session.user = user;
-				req.session.save();
-				if (!req.session.auth) {
-					return socket.disconnect("unauthorized");
-				}
-				return socket.emit("x", req.session.user);
-			}
-
-		});
 		socket.use((__, next) => {
+			console.log(req.sessionID)
 			if (__[0] === 'login' || __[0] === 'Registra' || __[0] === 'CorreoActivacion' || __[0] === 'activacion') {
 				next()
 			} else {
@@ -99,7 +89,6 @@ module.exports = function(io) {
 					req.session.reload((err) => {
 						if (err) {
 							console.log(err)
-							socket.emit('disconnect')
 						} else {
 							next();
 						}
@@ -108,22 +97,32 @@ module.exports = function(io) {
 			}
 		});
 		socket.on("login", async (auth) => {
+			console.log(req.sessionID)
 			const { email, password } = auth;
 			const user = await User.findOne({ email }).exec();
 			if (user === null) {
-				socket.emit("error", { message: "Usuario no existe en la Base de Datos" });
+				socket.emit("toastr", { type: "error", message: "Usuario no existe en la Base de Datos" });
 			} else if (user.password !== password) {
-				socket.emit("error", { message: "Password equivocado" });
+				socket.emit("toastr", { type: "error", message: "Password equivocado" });
 			} else {
 				req.session.auth = true;
 				req.session.user = user;
 				req.session.save();
 				if (!req.session.auth) {
+					console.log(req.session.user)
 					return socket.disconnect("unauthorized");
 				}
-				return socket.emit("auth", req.session.user);
+				return socket.emit("auth");
 			}
 		});
+		socket.on("Session", async () => {
+			const graf = await graficas.dashboard(req)
+			if (graf) {
+				req.session.user.dashboard = graf
+				req.session.save();
+				socket.emit("userAuth", req.session.user)
+			}
+		})
 		socket.on("Registra", async (data) => {
 			const { email, password } = data;
 			const user = await User.findOne({ email }).exec();
@@ -132,7 +131,7 @@ module.exports = function(io) {
 				socket.emit("usuarioC", data)
 			} else {
 				console.log('Ex')
-				socket.emit("error", { message: "Usuario ya existe" });
+				socket.emit("toastr", { type: "error", message: "Usuario ya existe" });
 			}
 		});
 		const audits = async (socketid, movimiento, pagina) => {
@@ -140,10 +139,12 @@ module.exports = function(io) {
 			const sa = await na.save();
 		};
 		audits(socket.id, "connection", jsonc.stringify(io))
-
 		socket.on("disconnect", () => {
 			socket.disconnect("disconnect");
 		});
+		socket.on("toastr",async(data)=>{
+			socket.emit("toastr",data)
+		})
 		socket.on("CorreoActivacion", async (data) => {
 			var dir = __dirname
 			let cryptlink = encrypt(data._id)
@@ -175,6 +176,24 @@ module.exports = function(io) {
 			if (data.activado == "") {
 				const actdata = await User.findOneAndUpdate({ email: email }, { activado: "Si", activadoat: Date.now() }).lean()
 			}
+			if (actdata) {
+				socket.emit("activado")
+			}
 		});
+		socket.on("usuarioRol", async (rol) => {
+			const data = await User.find({ rolempresa: rol }).lean()
+			if (data) {
+				socket.emit("usuarioRol", data)
+			}
+		});
+		socket.on("roles", async () => {
+			const data = await User.distinct("rolempresa").lean()
+			if (data) {
+				socket.emit("roles", data)
+			}
+		});
+		socket.on("dashboard", () => {
+			socket.emit("userAuth", req.session.user)
+		})
 	});
 }

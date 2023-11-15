@@ -13,14 +13,16 @@ module.exports = function(socket, urlmodel, schema) {
 		const sa = await na.save();
 	};
 	const emitAll = async () => {
-		const sch = await model.find();
+		const req = socket.request;
+		const id= req.session.user._id
+		const sch = await model.find({usuarioCreador:id});
 		socket.emit(schAll, sch);
 		audits(socket.id, schAll, socket)
 	};
 	socket.on(schC, async (data) => {
 		const nsch = new model(data);
 		const ssch = await nsch.save();
-		socket.emit("success", { message: "Alta exitosa" });
+		socket.emit("toastr", { type: "success", message: "Alta exitosa" });
 		socket.emit("Creado", ssch);
 		audits(socket.id, schC, socket)
 		emitAll()
@@ -33,17 +35,17 @@ module.exports = function(socket, urlmodel, schema) {
 	socket.on(schU, async (data) => {
 		await model.findByIdAndUpdate(data._id, { $set: data });
 		const sch = await model.findById(data._id);
-		socket.emit("success", { message: "Cambios Guardados con éxito" });
+		socket.emit("toastr", { type: "success", message: "Cambios Guardados con éxito" });
 		audits(socket.id, schU, socket)
 		socket.emit(schU, sch);
 	});
 	socket.on(schD, async (id) => {
 		await model.findByIdAndDelete(id);
-		socket.emit("success", { message: "Borrado Exitoso" });
+		socket.emit("toastr", { type: "success", message: "Borrado Exitoso" });
 		audits(socket.id, schD, socket)
 		emitAll();
 	});
-	socket.on(schAll, async () => {
+	socket.on(schAll, async (id) => {
 		audits(socket.id, schAll, socket)
 		emitAll()
 	});

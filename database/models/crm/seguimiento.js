@@ -4,6 +4,7 @@ const schema = new Schema(
   {
     tipo: { type: String, required: false },
     titulo: { type: String, required: false },
+		idCliente: { type: String, required: false },
     fechainicio: { type: Date, required: false },
     descripcion: { type: String, required: false },
     estatus: { type: String, required: false },
